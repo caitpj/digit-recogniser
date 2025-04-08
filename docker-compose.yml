@@ -1,0 +1,50 @@
+services:
+  web:
+    image: caitpj/digit-recogniser-web:multi
+    container_name: mnist-app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - db
+    environment:
+      - DB_HOST=db
+      - DB_NAME=mnist_app
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+    restart: always
+    networks:
+      - mnist_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  db:
+    image: postgres:15
+    container_name: mnist-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mnist_app
+    ports:
+      - "5432:5432"
+    restart: always
+    networks:
+      - mnist_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+networks:
+  mnist_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

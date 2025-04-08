@@ -1,0 +1,4 @@
+data/
+predictions/
+streamlit_env/
+mnist_model.pth
