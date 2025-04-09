@@ -7,6 +7,7 @@ import numpy as np
 import psycopg2
 from datetime import datetime
 import os
+import pandas as pd
 from streamlit_drawable_canvas import st_canvas
 
 # Define the CNN model (same as in training)
@@ -118,6 +119,42 @@ def log_prediction(predicted_digit, true_label, confidence):
     except Exception as e:
         st.error(f"Database error: {e}")
         return False
+
+# Function to fetch prediction data from database
+def get_prediction_data(limit=50):
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return None
+            
+        cursor = conn.cursor()
+        
+        # Get prediction data with newest first
+        cursor.execute(
+            "SELECT timestamp, predicted_digit, true_label, confidence FROM predictions ORDER BY timestamp DESC LIMIT %s",
+            (limit,)
+        )
+        
+        # Fetch all rows and column names
+        rows = cursor.fetchall()
+        columns = [desc[0] for desc in cursor.description]
+        
+        cursor.close()
+        conn.close()
+        
+        # Create dataframe
+        df = pd.DataFrame(rows, columns=columns)
+        
+        # Format the confidence as percentage
+        df['confidence'] = df['confidence'].apply(lambda x: f"{x:.2f}")
+        
+        # Format timestamp
+        df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        return df
+    except Exception as e:
+        st.error(f"Error fetching prediction data: {e}")
+        return None
 
 # Callback function for digit selection
 def select_digit(digit):
@@ -234,6 +271,31 @@ def main():
                     st.session_state.true_label = None
                 else:
                     st.error("Failed to log prediction.")
+    
+    # Display database contents at the bottom of the page
+    st.markdown("---")
+    st.header("Database Contents")
+    
+    # Add a refresh button
+    if st.button("Refresh Database View"):
+        st.rerun()
+    
+    # Fetch and display prediction data
+    prediction_data = get_prediction_data()
+    if prediction_data is not None and not prediction_data.empty:
+        st.dataframe(
+            prediction_data,
+            column_config={
+                "timestamp": "Timestamp",
+                "predicted_digit": "Predicted Digit",
+                "true_label": "True Digit",
+                "confidence": "Confidence"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.info("No prediction data available. Try making some predictions first!")
 
 if __name__ == "__main__":
     main()
